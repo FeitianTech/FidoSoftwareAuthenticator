@@ -10,6 +10,10 @@ use ciborium::{
 };
 use ctaphid_app::{App, Command, Error};
 use hmac::{Hmac, Mac};
+use p256::{
+    ecdh::diffie_hellman, elliptic_curve::sec1::ToEncodedPoint, EncodedPoint,
+    PublicKey as P256PublicKey, SecretKey as P256SecretKey,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use trussed::{
@@ -68,6 +72,7 @@ struct PinState {
     pin_hash: Option<[u8; 16]>,
     pin_retries: u8,
     consecutive_failures: u8,
+    pin_uv_auth_token: Option<[u8; 32]>,
 }
 
 impl PinState {
@@ -78,6 +83,7 @@ impl PinState {
             pin_hash: None,
             pin_retries: MAX_PIN_RETRIES,
             consecutive_failures: 0,
+            pin_uv_auth_token: None,
         }
     }
 
@@ -89,6 +95,7 @@ impl PinState {
         self.pin_hash = Some(hash);
         self.pin_retries = MAX_PIN_RETRIES;
         self.consecutive_failures = 0;
+        self.clear_pin_uv_auth_token();
     }
 
     fn retries(&self) -> u8 {
@@ -121,6 +128,31 @@ impl PinState {
             }
         }
     }
+
+    fn clear_pin_uv_auth_token(&mut self) {
+        if let Some(mut token) = self.pin_uv_auth_token.take() {
+            token.zeroize();
+        }
+    }
+
+    fn set_pin_uv_auth_token(&mut self, token: [u8; 32]) {
+        self.clear_pin_uv_auth_token();
+        self.pin_uv_auth_token = Some(token);
+    }
+
+    fn pin_uv_auth_token(&self) -> Option<[u8; 32]> {
+        self.pin_uv_auth_token.as_ref().map(|token| {
+            let mut copy = [0u8; 32];
+            copy.copy_from_slice(token);
+            copy
+        })
+    }
+}
+
+impl Drop for PinState {
+    fn drop(&mut self) {
+        self.clear_pin_uv_auth_token();
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -136,8 +168,8 @@ enum PinProtocolSession {
         public_key: Vec<u8>,
     },
     Classic {
-        public_key: Vec<u8>,
-        secret_material: [u8; 32],
+        public_key: EncodedPoint,
+        secret_key: P256SecretKey,
     },
 }
 
@@ -169,24 +201,28 @@ impl PinProtocolSession {
                     Value::Bytes(public_key.clone()),
                 ),
             ]),
-            PinProtocolSession::Classic { public_key, .. } => Value::Map(vec![
-                (
-                    Value::Integer(Integer::from(1)),
-                    Value::Integer(Integer::from(2)),
-                ),
-                (
-                    Value::Integer(Integer::from(3)),
-                    Value::Integer(Integer::from(-25)),
-                ),
-                (
-                    Value::Integer(Integer::from(-1)),
-                    Value::Integer(Integer::from(256)),
-                ),
-                (
-                    Value::Integer(Integer::from(-2)),
-                    Value::Bytes(public_key.clone()),
-                ),
-            ]),
+            PinProtocolSession::Classic { public_key, .. } => {
+                let (x, y) = match (public_key.x(), public_key.y()) {
+                    (Some(x_bytes), Some(y_bytes)) => (x_bytes.to_vec(), y_bytes.to_vec()),
+                    _ => (Vec::new(), Vec::new()),
+                };
+                Value::Map(vec![
+                    (
+                        Value::Integer(Integer::from(1)),
+                        Value::Integer(Integer::from(2)),
+                    ),
+                    (
+                        Value::Integer(Integer::from(3)),
+                        Value::Integer(Integer::from(-25)),
+                    ),
+                    (
+                        Value::Integer(Integer::from(-1)),
+                        Value::Integer(Integer::from(1)),
+                    ),
+                    (Value::Integer(Integer::from(-2)), Value::Bytes(x)),
+                    (Value::Integer(Integer::from(-3)), Value::Bytes(y)),
+                ])
+            }
         }
     }
 
@@ -221,9 +257,9 @@ impl PinProtocolSession {
             }
             PinProtocolSession::Classic {
                 public_key,
-                mut secret_material,
+                secret_key,
             } => {
-                let Some(peer_bytes) = platform_key
+                let Some(peer_x) = platform_key
                     .iter()
                     .find(|(k, _)| *k == Value::Integer(Integer::from(-2)))
                     .and_then(|(_, v)| match v {
@@ -231,21 +267,40 @@ impl PinProtocolSession {
                         _ => None,
                     })
                 else {
-                    secret_material.zeroize();
                     return Err(CTAP1_ERR_INVALID_PARAMETER);
                 };
+                let Some(peer_y) = platform_key
+                    .iter()
+                    .find(|(k, _)| *k == Value::Integer(Integer::from(-3)))
+                    .and_then(|(_, v)| match v {
+                        Value::Bytes(bytes) => Some(bytes.clone()),
+                        _ => None,
+                    })
+                else {
+                    return Err(CTAP1_ERR_INVALID_PARAMETER);
+                };
+                if peer_x.len() != 32 || peer_y.len() != 32 {
+                    return Err(CTAP1_ERR_INVALID_PARAMETER);
+                }
+
+                let mut peer_encoded = [0u8; 65];
+                peer_encoded[0] = 0x04;
+                peer_encoded[1..33].copy_from_slice(&peer_x);
+                peer_encoded[33..65].copy_from_slice(&peer_y);
+
+                let peer_public = P256PublicKey::from_sec1_bytes(&peer_encoded)
+                    .map_err(|_| CTAP1_ERR_INVALID_PARAMETER)?;
+                let shared =
+                    diffie_hellman(secret_key.to_nonzero_scalar(), peer_public.as_affine());
+
+                let auth_public_bytes = public_key.as_bytes();
                 let mut hasher = Sha256::new();
-                hasher.update(&public_key);
-                hasher.update(&peer_bytes);
+                hasher.update(auth_public_bytes);
+                hasher.update(&peer_encoded);
                 let transcript_hash = hasher.finalize().to_vec();
 
-                let mut secret_hasher = Sha256::new();
-                secret_hasher.update(&secret_material);
-                secret_hasher.update(&peer_bytes);
-                secret_material.zeroize();
-                let shared = secret_hasher.finalize();
-                let shared_bytes: [u8; 32] = shared.into();
-                let keys = derive_pin_uv_session_keys(&shared_bytes, &transcript_hash);
+                let shared_bytes = shared.raw_secret_bytes();
+                let keys = derive_pin_uv_session_keys(shared_bytes.as_ref(), &transcript_hash);
                 Ok((keys, transcript_hash))
             }
         }
@@ -385,12 +440,20 @@ where
                 }
             }
             PinProtocol::Classic => {
-                let bytes = syscall!(self.client.random_bytes(32)).bytes;
-                let mut secret = [0u8; 32];
-                secret.copy_from_slice(bytes.as_slice());
+                let secret_key = loop {
+                    let bytes = syscall!(self.client.random_bytes(32)).bytes;
+                    if bytes.len() != 32 {
+                        continue;
+                    }
+                    match P256SecretKey::from_slice(bytes.as_slice()) {
+                        Ok(secret) => break secret,
+                        Err(_) => continue,
+                    }
+                };
+                let public_key = secret_key.public_key().to_encoded_point(false);
                 PinProtocolSession::Classic {
-                    public_key: bytes.to_vec(),
-                    secret_material: secret,
+                    public_key,
+                    secret_key,
                 }
             }
         };
@@ -519,10 +582,14 @@ where
         }
 
         let random = syscall!(self.client.random_bytes(32)).bytes;
-        let mut token = random.to_vec();
+        if random.len() != 32 {
+            return Err(CTAP2_ERR_PROCESSING);
+        }
+        let mut token = [0u8; 32];
+        token.copy_from_slice(random.as_slice());
         let nonce = [0u8; 12];
         let encrypted = encrypt_pin_block(&keys, &nonce, &token, &transcript_hash);
-        token.zeroize();
+        self.pin_state.set_pin_uv_auth_token(token);
         let response = Value::Map(vec![
             (Value::Integer(Integer::from(2)), Value::Bytes(encrypted)),
             (
@@ -905,10 +972,30 @@ where
             return Err(CTAP2_ERR_PIN_AUTH_INVALID);
         }
 
-        match Self::map_get(&map, Value::Integer(Integer::from(6))) {
-            Some(Value::Bytes(bytes)) if bytes.len() == 32 => bytes.clone(),
+        let pin_uv_auth_param = match Self::map_get(&map, Value::Integer(Integer::from(6))) {
+            Some(Value::Bytes(bytes)) => bytes.clone(),
             _ => return Err(CTAP2_ERR_PIN_AUTH_INVALID),
         };
+        if pin_uv_auth_param.len() != 16 && pin_uv_auth_param.len() != 32 {
+            return Err(CTAP2_ERR_PIN_AUTH_INVALID);
+        }
+
+        let mut token = self
+            .pin_state
+            .pin_uv_auth_token()
+            .ok_or(CTAP2_ERR_PIN_AUTH_INVALID)?;
+        let mut mac = HmacSha256::new_from_slice(&token).map_err(|_| CTAP2_ERR_PROCESSING)?;
+        mac.update(&client_hash);
+        let computed = mac.finalize().into_bytes();
+        let uv_verified = match pin_uv_auth_param.len() {
+            16 => computed[..16] == pin_uv_auth_param[..],
+            32 => computed[..32] == pin_uv_auth_param[..],
+            _ => false,
+        };
+        token.zeroize();
+        if !uv_verified {
+            return Err(CTAP2_ERR_PIN_AUTH_INVALID);
+        }
 
         let mut credentials = self.load_credentials()?;
 
@@ -965,7 +1052,7 @@ where
         };
 
         let signing_key = SecretKey(secret_key_bytes.clone());
-        let auth_data = self.assertion_auth_data(&rp_id, sign_count, true);
+        let auth_data = self.assertion_auth_data(&rp_id, sign_count, uv_verified);
         let signature = sign_challenge(alg, &signing_key, &auth_data, &client_hash);
         self.save_credentials(&credentials)?;
 
