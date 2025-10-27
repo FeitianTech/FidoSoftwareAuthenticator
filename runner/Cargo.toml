@@ -1,0 +1,40 @@
+[package]
+name = "trussed-usbip"
+version = "0.0.1"
+authors = ["Nicolas Stalder <n@stalder.io>", "Conor Patrick <conor@solokeys.com>", "Szczepan Zalega <szczepan@nitrokey.com>"]
+edition = "2021"
+
+[dependencies]
+interchange = "0.3.0"
+littlefs2-core = "0.1"
+log = { version = "0.4.14", default-features = false }
+rand_chacha = { version = "0.3", default-features = false }
+rand_core = { version = "0.6", features = ["getrandom"] }
+trussed = { version = "0.1", default-features = false, features = ["log-all", "virt"] }
+usb-device = { version = "0.2.7", default-features = false }
+usbip-device = "0.1.5"
+
+# ctaphid
+ctaphid-dispatch = { version = "0.3", features = ["log-all"], optional = true }
+usbd-ctaphid = { version = "0.3", features = ["log-all"], optional = true }
+
+# ccid
+apdu-dispatch = { version = "0.3", optional = true }
+usbd-ccid = { version = "0.3", features = ["log-all"], optional = true }
+
+[dev-dependencies]
+clap = { version = "3.0.0", features = ["derive"] }
+clap-num = "1.0.0"
+delog = { version = "0.1.6", features = ["std-log"] }
+heapless-bytes = "0.3"
+littlefs2 = "0.6"
+pretty_env_logger = "0.4.0"
+trussed = "0.1"
+
+[features]
+default = ["ctaphid", "ccid"]
+ctaphid = ["ctaphid-dispatch", "usbd-ctaphid"]
+ccid = ["apdu-dispatch", "usbd-ccid"]
+
+[patch.crates-io]
+trussed = { git = "https://github.com/trussed-dev/trussed.git", rev = "024e0eca5fb7dbd2457831f7c7bffe4341e08775" }
