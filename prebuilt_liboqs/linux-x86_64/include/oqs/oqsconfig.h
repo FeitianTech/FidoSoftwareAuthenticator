@@ -3,20 +3,20 @@
 /** 
  * Version of liboqs as a string. Equivalent to {MAJOR}.{MINOR}.{PATCH}{PRE_RELEASE} 
  */
-#define OQS_VERSION_TEXT "0.14.1-dev"
+#define OQS_VERSION_TEXT "0.14.0"
 /** 
  * Version levels of liboqs as integers.
  */
 #define OQS_VERSION_MAJOR 0
 #define OQS_VERSION_MINOR 14
-#define OQS_VERSION_PATCH 1
+#define OQS_VERSION_PATCH 0
 /** 
  * OQS_VERSION_PRE_RELEASE is defined if this is a pre-release version of liboqs, otherwise it is undefined.
  * Examples: "-dev" or "-rc1".
  */
-#define OQS_VERSION_PRE_RELEASE "-dev"
+/* #undef OQS_VERSION_PRE_RELEASE */
 
-#define OQS_COMPILE_BUILD_TARGET "x86_64-Linux-5.15.167.4-microsoft-standard-WSL2"
+#define OQS_COMPILE_BUILD_TARGET "x86_64-Linux-6.6.87.2-microsoft-standard-WSL2"
 #define OQS_DIST_BUILD 1
 #define OQS_DIST_X86_64_BUILD 1
 /* #undef OQS_DIST_X86_BUILD */
@@ -72,7 +72,6 @@
 #define OQS_USE_SHA3_AVX512VL 1
 
 #define OQS_USE_CUPQC 0
-#define OQS_USE_ICICLE 0
 
 #define OQS_ENABLE_KEM_BIKE 1
 #define OQS_ENABLE_KEM_bike_l1 1
@@ -90,18 +89,6 @@
 #define OQS_ENABLE_KEM_NTRUPRIME 1
 #define OQS_ENABLE_KEM_ntruprime_sntrup761 1
 #define OQS_ENABLE_KEM_ntruprime_sntrup761_avx2 1
-
-#define OQS_ENABLE_KEM_NTRU 1
-#define OQS_ENABLE_KEM_ntru_hps2048509 1
-#define OQS_ENABLE_KEM_ntru_hps2048509_avx2 1
-#define OQS_ENABLE_KEM_ntru_hps2048677 1
-#define OQS_ENABLE_KEM_ntru_hps2048677_avx2 1
-#define OQS_ENABLE_KEM_ntru_hps4096821 1
-#define OQS_ENABLE_KEM_ntru_hps4096821_avx2 1
-#define OQS_ENABLE_KEM_ntru_hps40961229 1
-#define OQS_ENABLE_KEM_ntru_hrss701 1
-#define OQS_ENABLE_KEM_ntru_hrss701_avx2 1
-#define OQS_ENABLE_KEM_ntru_hrss1373 1
 
 ///// OQS_COPY_FROM_UPSTREAM_FRAGMENT_ADD_ALG_ENABLE_DEFINES_START
 
@@ -148,17 +135,25 @@
 #define OQS_ENABLE_KEM_ml_kem_512_x86_64 1
 /* #undef OQS_ENABLE_KEM_ml_kem_512_aarch64 */
 /* #undef OQS_ENABLE_KEM_ml_kem_512_cuda */
-/* #undef OQS_ENABLE_KEM_ml_kem_512_icicle_cuda */
 #define OQS_ENABLE_KEM_ml_kem_768 1
 #define OQS_ENABLE_KEM_ml_kem_768_x86_64 1
 /* #undef OQS_ENABLE_KEM_ml_kem_768_aarch64 */
 /* #undef OQS_ENABLE_KEM_ml_kem_768_cuda */
-/* #undef OQS_ENABLE_KEM_ml_kem_768_icicle_cuda */
 #define OQS_ENABLE_KEM_ml_kem_1024 1
 #define OQS_ENABLE_KEM_ml_kem_1024_x86_64 1
 /* #undef OQS_ENABLE_KEM_ml_kem_1024_aarch64 */
 /* #undef OQS_ENABLE_KEM_ml_kem_1024_cuda */
-/* #undef OQS_ENABLE_KEM_ml_kem_1024_icicle_cuda */
+
+#define OQS_ENABLE_SIG_DILITHIUM 1
+#define OQS_ENABLE_SIG_dilithium_2 1
+#define OQS_ENABLE_SIG_dilithium_2_avx2 1
+/* #undef OQS_ENABLE_SIG_dilithium_2_aarch64 */
+#define OQS_ENABLE_SIG_dilithium_3 1
+#define OQS_ENABLE_SIG_dilithium_3_avx2 1
+/* #undef OQS_ENABLE_SIG_dilithium_3_aarch64 */
+#define OQS_ENABLE_SIG_dilithium_5 1
+#define OQS_ENABLE_SIG_dilithium_5_avx2 1
+/* #undef OQS_ENABLE_SIG_dilithium_5_aarch64 */
 
 #define OQS_ENABLE_SIG_ML_DSA 1
 #define OQS_ENABLE_SIG_ml_dsa_44 1
@@ -336,165 +331,6 @@
 #define OQS_ENABLE_SIG_snova_SNOVA_29_6_5_avx2 1
 /* #undef OQS_ENABLE_SIG_snova_SNOVA_29_6_5_neon */
 ///// OQS_COPY_FROM_UPSTREAM_FRAGMENT_ADD_ALG_ENABLE_DEFINES_END
-///// OQS_COPY_FROM_SLH_DSA_FRAGMENT_ADD_ALG_ENABLE_DEFINES_START
-#define OQS_ENABLE_SIG_SLH_DSA 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_pure_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_224_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_256_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_384_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_224_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha2_512_256_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_224_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_256_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_384_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_sha3_512_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_128_prehash_shake_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_sha2_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_sha2_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_sha2_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_sha2_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_sha2_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_sha2_256f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_shake_128s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_shake_128f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_shake_192s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_shake_192f 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_shake_256s 1
-#define OQS_ENABLE_SIG_slh_dsa_shake_256_prehash_shake_256f 1
-///// OQS_COPY_FROM_SLH_DSA_FRAGMENT_ADD_ALG_ENABLE_DEFINES_END
 
 ///// OQS_COPY_FROM_LIBJADE_FRAGMENT_ADD_ALG_ENABLE_DEFINES_START
 
