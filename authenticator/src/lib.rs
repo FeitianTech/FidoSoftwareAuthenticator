@@ -265,9 +265,9 @@ pub fn mldsa_paramset_from_alg(alg: CoseAlg) -> Option<ParamSet> {
 /// Translate an ML-KEM parameter set to the corresponding COSE `alg` value.
 pub fn cose_alg_for_kem_param_set(param_set: KemParamSet) -> i32 {
     match param_set {
-        KemParamSet::MLKem512 => COSE_ALG_ML_KEM_512,
-        KemParamSet::MLKem768 => COSE_ALG_ML_KEM_768,
-        KemParamSet::MLKem1024 => COSE_ALG_ML_KEM_1024,
+        KemParamSet::MLKEM512 => COSE_ALG_ML_KEM_512,
+        KemParamSet::MLKEM768 => COSE_ALG_ML_KEM_768,
+        KemParamSet::MLKEM1024 => COSE_ALG_ML_KEM_1024,
     }
 }
 
@@ -466,15 +466,15 @@ mod tests {
     #[test]
     fn mlkem_alg_mapping_matches_expected_values() {
         assert_eq!(
-            cose_alg_for_kem_param_set(KemParamSet::MLKem512),
+            cose_alg_for_kem_param_set(KemParamSet::MLKEM512),
             COSE_ALG_ML_KEM_512
         );
         assert_eq!(
-            cose_alg_for_kem_param_set(KemParamSet::MLKem768),
+            cose_alg_for_kem_param_set(KemParamSet::MLKEM768),
             COSE_ALG_ML_KEM_768
         );
         assert_eq!(
-            cose_alg_for_kem_param_set(KemParamSet::MLKem1024),
+            cose_alg_for_kem_param_set(KemParamSet::MLKEM1024),
             COSE_ALG_ML_KEM_1024
         );
     }
@@ -580,11 +580,11 @@ mod tests {
 
     #[test]
     fn mlkem_pin_protocol_roundtrip() {
-        let (pk, sk) = trussed_mlkem::keypair(KemParamSet::MLKem512);
+        let (pk, sk) = trussed_mlkem::keypair(KemParamSet::MLKEM512);
         let (ciphertext, shared_secret_client) =
-            trussed_mlkem::encapsulate(KemParamSet::MLKem512, &pk);
+            trussed_mlkem::encapsulate(KemParamSet::MLKEM512, &pk);
         let shared_secret_auth =
-            trussed_mlkem::decapsulate(KemParamSet::MLKem512, &sk, &ciphertext)
+            trussed_mlkem::decapsulate(KemParamSet::MLKEM512, &sk, &ciphertext)
                 .expect("ciphertext should be valid");
         let transcript_hash = b"transcript";
         let client_keys = derive_pqc_pin_uv_session_keys(&shared_secret_client.0, transcript_hash);

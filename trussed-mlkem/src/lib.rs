@@ -56,9 +56,9 @@ extern "C" {
 /// Available ML-KEM parameter sets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParamSet {
-    MLKem512,
-    MLKem768,
-    MLKem1024,
+    MLKEM512,
+    MLKEM768,
+    MLKEM1024,
 }
 
 /// Public key wrapper.
@@ -92,9 +92,9 @@ impl Drop for SharedSecret {
 /// Return the lengths of the key and ciphertext buffers for a parameter set.
 fn lengths(ps: ParamSet) -> (usize, usize, usize, usize) {
     match ps {
-        ParamSet::MLKem512 => (800, 1632, 768, 32),
-        ParamSet::MLKem768 => (1184, 2400, 1088, 32),
-        ParamSet::MLKem1024 => (1568, 3168, 1568, 32),
+        ParamSet::MLKEM512 => (800, 1632, 768, 32),
+        ParamSet::MLKEM768 => (1184, 2400, 1088, 32),
+        ParamSet::MLKEM1024 => (1568, 3168, 1568, 32),
     }
 }
 
@@ -105,7 +105,7 @@ pub fn keypair(ps: ParamSet) -> (PublicKey, SecretKey) {
     let mut sk = vec![0u8; sk_len];
     unsafe {
         let rc = match ps {
-            ParamSet::MLKem512 => {
+            ParamSet::MLKEM512 => {
                 #[cfg(feature = "mlkem512")]
                 {
                     OQS_KEM_ml_kem_512_keypair(pk.as_mut_ptr(), sk.as_mut_ptr())
@@ -115,7 +115,7 @@ pub fn keypair(ps: ParamSet) -> (PublicKey, SecretKey) {
                     panic!("feature mlkem512 is not enabled");
                 }
             }
-            ParamSet::MLKem768 => {
+            ParamSet::MLKEM768 => {
                 #[cfg(feature = "mlkem768")]
                 {
                     OQS_KEM_ml_kem_768_keypair(pk.as_mut_ptr(), sk.as_mut_ptr())
@@ -125,7 +125,7 @@ pub fn keypair(ps: ParamSet) -> (PublicKey, SecretKey) {
                     panic!("feature mlkem768 is not enabled");
                 }
             }
-            ParamSet::MLKem1024 => {
+            ParamSet::MLKEM1024 => {
                 #[cfg(feature = "mlkem1024")]
                 {
                     OQS_KEM_ml_kem_1024_keypair(pk.as_mut_ptr(), sk.as_mut_ptr())
@@ -148,7 +148,7 @@ pub fn encapsulate(ps: ParamSet, pk: &PublicKey) -> (Ciphertext, SharedSecret) {
     let mut ss = vec![0u8; ss_len];
     unsafe {
         let rc = match ps {
-            ParamSet::MLKem512 => {
+            ParamSet::MLKEM512 => {
                 #[cfg(feature = "mlkem512")]
                 {
                     OQS_KEM_ml_kem_512_encaps(ct.as_mut_ptr(), ss.as_mut_ptr(), pk.0.as_ptr())
@@ -158,7 +158,7 @@ pub fn encapsulate(ps: ParamSet, pk: &PublicKey) -> (Ciphertext, SharedSecret) {
                     panic!("feature mlkem512 is not enabled");
                 }
             }
-            ParamSet::MLKem768 => {
+            ParamSet::MLKEM768 => {
                 #[cfg(feature = "mlkem768")]
                 {
                     OQS_KEM_ml_kem_768_encaps(ct.as_mut_ptr(), ss.as_mut_ptr(), pk.0.as_ptr())
@@ -168,7 +168,7 @@ pub fn encapsulate(ps: ParamSet, pk: &PublicKey) -> (Ciphertext, SharedSecret) {
                     panic!("feature mlkem768 is not enabled");
                 }
             }
-            ParamSet::MLKem1024 => {
+            ParamSet::MLKEM1024 => {
                 #[cfg(feature = "mlkem1024")]
                 {
                     OQS_KEM_ml_kem_1024_encaps(ct.as_mut_ptr(), ss.as_mut_ptr(), pk.0.as_ptr())
@@ -204,7 +204,7 @@ pub fn decapsulate(
     let mut ss = vec![0u8; ss_len];
     unsafe {
         let rc = match ps {
-            ParamSet::MLKem512 => {
+            ParamSet::MLKEM512 => {
                 #[cfg(feature = "mlkem512")]
                 {
                     OQS_KEM_ml_kem_512_decaps(ss.as_mut_ptr(), ct.0.as_ptr(), sk.0.as_ptr())
@@ -214,7 +214,7 @@ pub fn decapsulate(
                     panic!("feature mlkem512 is not enabled");
                 }
             }
-            ParamSet::MLKem768 => {
+            ParamSet::MLKEM768 => {
                 #[cfg(feature = "mlkem768")]
                 {
                     OQS_KEM_ml_kem_768_decaps(ss.as_mut_ptr(), ct.0.as_ptr(), sk.0.as_ptr())
@@ -224,7 +224,7 @@ pub fn decapsulate(
                     panic!("feature mlkem768 is not enabled");
                 }
             }
-            ParamSet::MLKem1024 => {
+            ParamSet::MLKEM1024 => {
                 #[cfg(feature = "mlkem1024")]
                 {
                     OQS_KEM_ml_kem_1024_decaps(ss.as_mut_ptr(), ct.0.as_ptr(), sk.0.as_ptr())
@@ -268,16 +268,16 @@ mod tests {
 
     #[test]
     fn mlkem_512_roundtrip() {
-        roundtrip(ParamSet::MLKem512);
+        roundtrip(ParamSet::MLKEM512);
     }
 
     #[test]
     fn mlkem_768_roundtrip() {
-        roundtrip(ParamSet::MLKem768);
+        roundtrip(ParamSet::MLKEM768);
     }
 
     #[test]
     fn mlkem_1024_roundtrip() {
-        roundtrip(ParamSet::MLKem1024);
+        roundtrip(ParamSet::MLKEM1024);
     }
 }
