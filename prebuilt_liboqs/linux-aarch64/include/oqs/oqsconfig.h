@@ -143,7 +143,7 @@
 /* #undef OQS_ENABLE_KEM_kyber_1024_avx2 */
 /* #undef OQS_ENABLE_KEM_kyber_1024_aarch64 */
 
-/* #undef OQS_ENABLE_KEM_ML_KEM */
+#define OQS_ENABLE_KEM_ML_KEM 1
 /* #undef OQS_ENABLE_KEM_ml_kem_512 */
 /* #undef OQS_ENABLE_KEM_ml_kem_512_x86_64 */
 /* #undef OQS_ENABLE_KEM_ml_kem_512_aarch64 */
