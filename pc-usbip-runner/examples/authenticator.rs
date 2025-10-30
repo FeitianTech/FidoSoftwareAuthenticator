@@ -23,19 +23,18 @@ use trussed::{
 };
 use trussed_usbip::{Platform, Store, Syscall};
 
-/// USB/IP based virtualisation of the ML-DSA authenticator.
 #[derive(Parser, Debug)]
 #[clap(about, version, author)]
 struct Args {
-    /// USB product string
-    #[clap(short = 'n', long, default_value = "Feitian ML-DSA Authenticator")]
+    /// USB product
+    #[clap(short = 'n', long, default_value = "Feitian FIDO2 Software Authenticator (ML-DSA)")]
     product: String,
 
-    /// USB manufacturer string
-    #[clap(short, long, default_value = "Feitian Technologies")]
+    /// USB manufacturer
+    #[clap(short, long, default_value = "Feitian Technologies Co., Ltd.")]
     manufacturer: String,
 
-    /// Optional USB serial number string
+    /// USB serial number
     #[clap(long)]
     serial: Option<String>,
 
@@ -44,15 +43,15 @@ struct Args {
     state_file: PathBuf,
 
     /// USB VID
-    #[clap(short, long, parse(try_from_str = maybe_hex), default_value_t = 0x20a0)]
+    #[clap(short, long, parse(try_from_str = maybe_hex), default_value_t = 0x1998)]
     vid: u16,
 
     /// USB PID
-    #[clap(short, long, parse(try_from_str = maybe_hex), default_value_t = 0x42b3)]
+    #[clap(short, long, parse(try_from_str = maybe_hex), default_value_t = 0x0616)]
     pid: u16,
 
-    /// Authenticator AAGUID as 32 hex characters (hyphens optional)
-    #[clap(long, default_value = "00000000000000000000000000000000")]
+    /// Authenticator AAGUID
+    #[clap(long, default_value = "4645495449414E980616525A30310000")]
     aaguid: String,
 }
 
