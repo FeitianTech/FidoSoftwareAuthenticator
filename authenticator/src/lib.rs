@@ -365,7 +365,11 @@ pub fn credential_secret_from_bytes(alg: CoseAlg, bytes: &[u8]) -> Result<Creden
     match alg {
         CoseAlg::ES256 => {
             let secret = P256SecretKey::from_slice(bytes).map_err(|_| ())?;
-            Ok(CredentialSecretKey::Es256(P256SigningKey::from(secret)))
+            let mut scalar_bytes = secret.to_bytes();
+            let signing_key =
+                P256SigningKey::from_bytes(&scalar_bytes).map_err(|_| ())?;
+            scalar_bytes.zeroize();
+            Ok(CredentialSecretKey::Es256(signing_key))
         }
         CoseAlg::MLDSA44 | CoseAlg::MLDSA65 | CoseAlg::MLDSA87 => {
             Ok(CredentialSecretKey::MlDsa(SecretKey(bytes.to_vec())))
