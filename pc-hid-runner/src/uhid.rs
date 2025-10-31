@@ -306,7 +306,7 @@ fn descriptor_to_create2(descriptor: &HidDeviceDescriptor) -> io::Result<raw::uh
     req.product = descriptor.product_id;
     req.version = descriptor.version;
     req.country = descriptor.country;
-    req.rd_data[..CTAPHID_REPORT_DESCRIPTOR.len()].copy_from_slice(CTAPHID_REPORT_DESCRIPTOR);
+    req.rd_data[..CTAPHID_REPORT_DESCRIPTOR.len()].copy_from_slice(&CTAPHID_REPORT_DESCRIPTOR);
     Ok(req)
 }
 
