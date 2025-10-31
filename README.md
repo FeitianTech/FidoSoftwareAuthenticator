@@ -97,8 +97,7 @@ If you build liboqs yourself, ensure the resulting shared library matches the ta
 
 ## Run the HID runner
 
-The HID runner provisions a virtual authenticator through `/dev/uhid`, creating a `hidraw` node that browsers can use transparently. The launches the service in the foreground:
-
+The HID runner provisions a virtual authenticator through `/dev/uhid`, creating a `hidraw` node that browsers can use transparently. From the root of the repository: 
 ```bash
 # Starting with clean state
 sudo pkill -f pc-hid-runner || true
