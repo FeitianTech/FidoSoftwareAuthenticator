@@ -455,7 +455,7 @@ mod raw {
 
     pub const UHID_EVENT_SIZE: usize = core::mem::size_of::<uhid_event>();
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_create2_req {
         pub name: [u8; 128],
@@ -476,7 +476,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_input2_req {
         pub size: u16,
@@ -489,7 +489,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_output_req {
         pub data: [u8; UHID_DATA_MAX],
@@ -503,7 +503,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_get_report_req {
         pub id: u32,
@@ -517,7 +517,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_get_report_reply_req {
         pub id: u32,
@@ -532,7 +532,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_set_report_req {
         pub id: u32,
@@ -548,7 +548,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_set_report_reply_req {
         pub id: u32,
@@ -561,7 +561,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_start_req {
         pub dev_flags: u64,
@@ -573,7 +573,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub union uhid_event_union {
         pub create2: uhid_create2_req,
@@ -592,7 +592,7 @@ mod raw {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Clone, Copy)]
     pub struct uhid_event {
         pub type_: u32,
