@@ -92,12 +92,6 @@ pub struct DeviceArgs {
     /// Authenticator AAGUID
     #[clap(long, default_value = "4645495449414E980616525A30310000")]
     pub aaguid: String,
-    /// Require user gestures instead of automatically satisfying presence checks
-    #[clap(long)]
-    pub manual_user_presence: bool,
-    /// Suppress attestation certificate material for makeCredential operations
-    #[clap(long)]
-    pub suppress_attestation: bool,
     /// Policy controlling whether PQC PIN/UV is preferred, required, or disabled
     #[clap(long, value_enum, default_value_t = PqcPolicyArg::Prefer)]
     pub pqc_policy: PqcPolicyArg,
@@ -173,8 +167,6 @@ impl StartCommand {
                 product: self.device.product.clone(),
                 serial: self.device.serial.clone(),
             },
-            auto_user_presence: !self.device.manual_user_presence,
-            suppress_attestation: self.device.suppress_attestation,
             pqc_policy: self.device.pqc_policy.into(),
             backend: self.device.backend.into_backend(),
         })

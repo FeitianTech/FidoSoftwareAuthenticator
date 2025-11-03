@@ -1,5 +1,3 @@
-#![cfg(feature = "legacy")]
-
 //! USB/IP runner that exposes the ML-DSA authenticator over CTAPHID.
 //!
 //! The example wires the authenticator's CTAP application into the
@@ -11,16 +9,14 @@ use std::path::PathBuf;
 use authenticator::ctap::CtapApp;
 use clap::Parser;
 use clap_num::maybe_hex;
-use littlefs2_core::path;
 use transport_core::state::{default_state_dir, IdentityConfig, PersistentStore};
 use trussed::{
     backend::{CoreOnly, NoId},
-    client::Client,
     pipe::{ServiceEndpoint, TrussedChannel},
     service::Service,
     types::{CoreContext, NoData},
 };
-use trussed_usbip::{exec, set_waiting, Builder, Client, Platform, Syscall};
+use trussed_usbip::{exec, set_waiting, Apps as TrussedApps, Builder, Client, Platform, Syscall};
 
 #[derive(Parser, Debug)]
 #[clap(about, version, author)]
@@ -56,23 +52,18 @@ struct Args {
     /// Authenticator AAGUID
     #[clap(long, default_value = "4645495449414E980616525A30310000")]
     aaguid: String,
-
-    /// Require user gestures instead of automatically satisfying presence checks
-    #[clap(long)]
-    manual_user_presence: bool,
 }
 
 #[derive(Clone, Copy)]
 struct AppData {
     aaguid: [u8; 16],
-    auto_user_presence: bool,
 }
 
-struct Apps<C: Client> {
-    ctap: CtapApp<C>,
+struct Apps {
+    ctap: CtapApp<Client>,
 }
 
-impl<'a> trussed_usbip::Apps<'a, CoreOnly> for Apps<Client<CoreOnly>> {
+impl<'a> TrussedApps<'a, CoreOnly> for Apps {
     type Data = AppData;
 
     fn new(
@@ -83,11 +74,10 @@ impl<'a> trussed_usbip::Apps<'a, CoreOnly> for Apps<Client<CoreOnly>> {
     ) -> Self {
         static CHANNEL: TrussedChannel = TrussedChannel::new();
         let (requester, responder) = CHANNEL.split().expect("Trussed channel split");
-        let context = CoreContext::new(path!("authenticator").into());
+        let context = CoreContext::new(littlefs2::path!("authenticator").into());
         endpoints.push(ServiceEndpoint::new(responder, context, &[]));
         let client = Client::new(requester, syscall, None);
         let mut ctap = CtapApp::new(client, data.aaguid);
-        ctap.set_auto_user_presence(data.auto_user_presence);
         ctap.set_keepalive_callback(set_waiting);
         Self { ctap }
     }
@@ -152,16 +142,8 @@ fn main() {
 
     log::info!("Initializing Trussed");
     let platform = Platform::new(store);
-    let runner = Builder::new(options).build::<Apps<_>>();
-    exec(
-        runner,
-        platform,
-        AppData {
-            aaguid,
-            auto_user_presence: !args.manual_user_presence,
-        },
-    )
-    .expect("usbip transport exited");
+    let runner = Builder::new(options).build::<Apps>();
+    exec(runner, platform, AppData { aaguid }).expect("usbip transport exited");
 }
 
 #[cfg(test)]

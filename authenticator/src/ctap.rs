@@ -19,18 +19,16 @@ use ctaphid_app::{App, Command, Error};
 use hmac::{Hmac, Mac};
 use log::info;
 use p256::{
-    ecdh::diffie_hellman,
-    ecdsa::{signature::Signer, Signature as P256EcdsaSignature, SigningKey},
-    elliptic_curve::sec1::ToEncodedPoint,
-    EncodedPoint, PublicKey as P256PublicKey, SecretKey as P256SecretKey,
+    ecdh::diffie_hellman, elliptic_curve::sec1::ToEncodedPoint, EncodedPoint,
+    PublicKey as P256PublicKey, SecretKey as P256SecretKey,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use trussed::client::{Client as TrussedClient, CryptoClient, FilesystemClient};
 use trussed::interrupt::InterruptFlag;
 use trussed::syscall;
+#[cfg(not(test))]
 use trussed::try_syscall;
-use trussed::types::consent;
 #[cfg(not(test))]
 use trussed::types::{Location, Message, PathBuf};
 use trussed_mlkem::{self, Ciphertext, ParamSet as KemParamSet, SecretKey as KemSecretKey};
@@ -101,46 +99,6 @@ pub(crate) fn take_waiting_log() -> Vec<bool> {
 
 fn noop_keepalive(_: bool) {}
 
-fn set_keepalive_waiting(callback: fn(bool), waiting: bool) {
-    callback(waiting);
-
-    #[cfg(test)]
-    {
-        WAITING_LOG
-            .lock()
-            .expect("waiting log mutex poisoned")
-            .push(waiting);
-    }
-}
-
-struct WaitingState {
-    active: bool,
-    callback: fn(bool),
-}
-
-impl WaitingState {
-    fn begin(callback: fn(bool)) -> Self {
-        set_keepalive_waiting(callback, true);
-        Self {
-            active: true,
-            callback,
-        }
-    }
-
-    fn clear(&mut self) {
-        if self.active {
-            set_keepalive_waiting(self.callback, false);
-            self.active = false;
-        }
-    }
-}
-
-impl Drop for WaitingState {
-    fn drop(&mut self) {
-        self.clear();
-    }
-}
-
 struct InterruptWorkGuard<'a> {
     flag: &'a InterruptFlag,
 }
@@ -183,17 +141,10 @@ fn decrypt_shared_secret(key: &[u8; 32], ciphertext: &[u8]) -> Result<Vec<u8>, u
 const MAX_PIN_RETRIES: u8 = 8;
 const MAX_PIN_FAILURES_BEFORE_BLOCK: u8 = 3;
 
-const USER_PRESENCE_POLL_TIMEOUT_MS: u32 = 200;
-const USER_PRESENCE_MAX_WAIT_MS: u32 = 10_000;
-
 type HmacSha256 = Hmac<Sha256>;
-
-const COSE_ALG_ES256: i32 = -7;
 
 #[cfg(not(test))]
 const CREDENTIAL_STORE_PATH: &str = "credentials.cbor";
-#[cfg(not(test))]
-const ATTESTATION_STORE_PATH: &str = "attestation.cbor";
 const PIN_UV_AUTH_PROTOCOL_CLASSIC_V1: i32 = 1;
 const PIN_UV_AUTH_PROTOCOL_CLASSIC_V2: i32 = 2;
 #[cfg_attr(not(test), allow(dead_code))]
@@ -230,12 +181,6 @@ struct StoredCredential {
     #[serde(default)]
     cred_protect: Option<u8>,
     sign_count: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct StoredAttestation {
-    private_key: Vec<u8>,
-    certificate_chain: Vec<Vec<u8>>,
 }
 
 #[derive(Debug)]
@@ -641,15 +586,10 @@ pub struct CtapApp<C> {
     pin_protocol_session: Option<PinProtocolSession>,
     platform_declined_pqc: bool,
     pqc_policy: PqcPolicy,
-    suppress_attestation: bool,
     cred_mgmt_state: CredentialManagementState,
     pending_assertion: Option<PendingAssertion>,
-    attestation_private_key: Option<Vec<u8>>,
-    attestation_certificate_chain: Option<Vec<Vec<u8>>>,
-    attestation_material_initialized: bool,
     keepalive_callback: fn(bool),
     interrupt_flag: &'static InterruptFlag,
-    auto_user_presence: bool,
     #[cfg(test)]
     stored_credentials: Vec<StoredCredential>,
 }
@@ -666,15 +606,10 @@ where
             pin_protocol_session: None,
             platform_declined_pqc: false,
             pqc_policy: PqcPolicy::default(),
-            suppress_attestation: false,
             cred_mgmt_state: CredentialManagementState::new(),
             pending_assertion: None,
-            attestation_private_key: None,
-            attestation_certificate_chain: None,
-            attestation_material_initialized: false,
             keepalive_callback: noop_keepalive,
             interrupt_flag: Box::leak(Box::new(InterruptFlag::new())),
-            auto_user_presence: false,
             #[cfg(test)]
             stored_credentials: Vec::new(),
         };
@@ -685,17 +620,9 @@ where
         self.keepalive_callback = callback;
     }
 
-    pub fn set_auto_user_presence(&mut self, enabled: bool) {
-        self.auto_user_presence = enabled;
-    }
-
     pub fn set_pqc_policy(&mut self, policy: PqcPolicy) {
         self.pqc_policy = policy;
         self.platform_declined_pqc = matches!(policy, PqcPolicy::ClassicOnly);
-    }
-
-    pub fn suppress_attestation(&mut self, suppress: bool) {
-        self.suppress_attestation = suppress;
     }
 
     fn supported_pin_uv_protocols(&self) -> &'static [i32] {
@@ -811,59 +738,7 @@ where
 
     fn await_user_presence(&mut self) -> Result<bool, u8> {
         let _interrupt_guard = InterruptWorkGuard::begin(self.interrupt_flag);
-        let mut waiting = WaitingState::begin(self.keepalive_callback);
-        if self.auto_user_presence {
-            waiting.clear();
-            return Ok(true);
-        }
-        let mut waited_ms = 0u32;
-        loop {
-            if self.interrupt_flag.is_interrupted() {
-                waiting.clear();
-                return Err(CTAP2_ERR_KEEPALIVE_CANCEL);
-            }
-
-            let consent = match try_syscall!(self
-                .client
-                .confirm_user_present(USER_PRESENCE_POLL_TIMEOUT_MS))
-            {
-                Ok(reply) => reply,
-                Err(_) => {
-                    waiting.clear();
-                    return Err(CTAP2_ERR_PROCESSING);
-                }
-            };
-
-            match consent.result {
-                Ok(()) => {
-                    waiting.clear();
-                    return Ok(true);
-                }
-                Err(consent::Error::TimedOut) => {
-                    waited_ms = waited_ms.saturating_add(USER_PRESENCE_POLL_TIMEOUT_MS);
-                    if waited_ms >= USER_PRESENCE_MAX_WAIT_MS {
-                        waiting.clear();
-                        return Err(CTAP2_ERR_NOT_ALLOWED);
-                    }
-                }
-                Err(consent::Error::Interrupted) => {
-                    waiting.clear();
-                    return Err(CTAP2_ERR_KEEPALIVE_CANCEL);
-                }
-                Err(consent::Error::TimeoutNotImplemented) => {
-                    waiting.clear();
-                    return Err(CTAP2_ERR_NOT_ALLOWED);
-                }
-                Err(consent::Error::FailedToInterrupt) => {
-                    waiting.clear();
-                    return Err(CTAP2_ERR_PROCESSING);
-                }
-                Err(_) => {
-                    waiting.clear();
-                    return Err(CTAP2_ERR_NOT_ALLOWED);
-                }
-            }
-        }
+        Ok(true)
     }
 
     fn credential_allows(
@@ -1328,112 +1203,9 @@ where
         Ok(out)
     }
 
-    fn clear_attestation_material(&mut self) {
-        if let Some(mut key) = self.attestation_private_key.take() {
-            key.zeroize();
-        }
-        self.attestation_certificate_chain = None;
-        self.attestation_material_initialized = false;
-    }
-
-    fn ensure_attestation_material(&mut self) {
-        if self.attestation_material_initialized {
-            return;
-        }
-
-        if matches!(
-            (
-                self.attestation_private_key.as_ref(),
-                self.attestation_certificate_chain.as_ref()
-            ),
-            (Some(_), Some(chain)) if !chain.is_empty()
-        ) {
-            self.attestation_material_initialized = true;
-            return;
-        }
-
-        self.attestation_material_initialized = true;
-
-        if self.load_attestation_material().is_err() {
-            self.clear_attestation_material();
-            self.attestation_material_initialized = true;
-        }
-    }
-
     #[cfg(not(test))]
     fn store_path() -> Result<PathBuf, u8> {
         PathBuf::try_from(CREDENTIAL_STORE_PATH).map_err(|_| CTAP2_ERR_PROCESSING)
-    }
-
-    #[cfg(not(test))]
-    fn attestation_store_path() -> Result<PathBuf, u8> {
-        PathBuf::try_from(ATTESTATION_STORE_PATH).map_err(|_| CTAP2_ERR_PROCESSING)
-    }
-
-    #[cfg(not(test))]
-    fn load_attestation_material(&mut self) -> Result<(), u8> {
-        let path = Self::attestation_store_path()?;
-        match try_syscall!(self.client.read_file(Location::Internal, path.clone())) {
-            Ok(reply) => {
-                let data = reply.data.as_slice();
-                if data.is_empty() {
-                    self.clear_attestation_material();
-                    return Ok(());
-                }
-
-                let stored: StoredAttestation =
-                    from_reader(data).map_err(|_| CTAP2_ERR_INVALID_CBOR)?;
-                if stored.private_key.is_empty()
-                    || stored.certificate_chain.is_empty()
-                    || stored.private_key.len() != 32
-                {
-                    self.clear_attestation_material();
-                    return Err(CTAP2_ERR_INVALID_CBOR);
-                }
-
-                self.clear_attestation_material();
-                self.attestation_private_key = Some(stored.private_key);
-                self.attestation_certificate_chain = Some(stored.certificate_chain);
-                Ok(())
-            }
-            Err(_) => {
-                self.clear_attestation_material();
-                Ok(())
-            }
-        }
-    }
-
-    #[cfg(test)]
-    fn load_attestation_material(&mut self) -> Result<(), u8> {
-        Ok(())
-    }
-
-    fn attestation_signature(
-        &mut self,
-        auth_data: &[u8],
-        client_hash: &[u8],
-    ) -> Result<Option<(Vec<u8>, Vec<Vec<u8>>)>, u8> {
-        self.ensure_attestation_material();
-
-        let (key_bytes, chain) = match (
-            self.attestation_private_key.as_ref(),
-            self.attestation_certificate_chain.as_ref(),
-        ) {
-            (Some(key), Some(chain)) if !chain.is_empty() => (key, chain),
-            _ => return Ok(None),
-        };
-
-        if key_bytes.len() != 32 {
-            return Err(CTAP2_ERR_PROCESSING);
-        }
-
-        let signing_key = SigningKey::from_slice(key_bytes).map_err(|_| CTAP2_ERR_PROCESSING)?;
-        let mut message = Vec::with_capacity(auth_data.len() + client_hash.len());
-        message.extend_from_slice(auth_data);
-        message.extend_from_slice(client_hash);
-        let signature: P256EcdsaSignature = signing_key.sign(&message);
-        let der = signature.to_der();
-        Ok(Some((der.as_bytes().to_vec(), chain.clone())))
     }
 
     #[cfg(not(test))]
@@ -2131,7 +1903,10 @@ where
                 else {
                     continue;
                 };
-                if credentials.iter().any(|c| c.credential_id == *id) {
+                if credentials
+                    .iter()
+                    .any(|c| c.credential_id == *id && c.rp_id == rp_id)
+                {
                     return Err(CTAP2_ERR_CREDENTIAL_EXCLUDED);
                 }
             }
@@ -2305,35 +2080,8 @@ where
             initial_sign_count,
             extension_bytes.as_deref(),
         );
-        let (attestation_format, att_stmt) = if self.suppress_attestation {
-            (Value::Text("none".into()), Value::Map(Vec::new()))
-        } else {
-            let attestation_result = self.attestation_signature(&auth_data, &client_hash)?;
-            let att_stmt = if let Some((signature, certificate_chain)) = attestation_result {
-                let entries = vec![
-                    (
-                        Value::Text("alg".into()),
-                        Value::Integer(Integer::from(COSE_ALG_ES256)),
-                    ),
-                    (Value::Text("sig".into()), Value::Bytes(signature)),
-                    (
-                        Value::Text("x5c".into()),
-                        Value::Array(certificate_chain.into_iter().map(Value::Bytes).collect()),
-                    ),
-                ];
-                canonical_map(entries)
-            } else {
-                let signature = sign_challenge(alg, &secret_key, &auth_data, &client_hash);
-                canonical_map(vec![
-                    (
-                        Value::Text("alg".into()),
-                        Value::Integer(Integer::from(alg as i32)),
-                    ),
-                    (Value::Text("sig".into()), Value::Bytes(signature)),
-                ])
-            };
-            (Value::Text("packed".into()), att_stmt)
-        };
+        let attestation_format = Value::Text("none".into());
+        let att_stmt = Value::Map(Vec::new());
 
         let mut response_map = vec![
             (Value::Integer(Integer::from(1)), attestation_format),

@@ -37,8 +37,6 @@ pub struct RunnerConfig {
     pub state_dir: PathBuf,
     pub aaguid: [u8; 16],
     pub identity: IdentityStrings,
-    pub auto_user_presence: bool,
-    pub suppress_attestation: bool,
     pub pqc_policy: PqcPolicy,
     pub backend: Backend,
 }
@@ -46,8 +44,6 @@ pub struct RunnerConfig {
 #[derive(Clone, Copy)]
 pub struct AppData {
     pub aaguid: [u8; 16],
-    pub auto_user_presence: bool,
-    pub suppress_attestation: bool,
     pub pqc_policy: PqcPolicy,
 }
 
@@ -70,8 +66,6 @@ impl<'a> TrussedApps<'a, CoreOnly> for Apps {
         endpoints.push(ServiceEndpoint::new(responder, context, &[]));
         let client = crate::Client::new(requester, syscall, None);
         let mut ctap = CtapApp::new(client, data.aaguid);
-        ctap.set_auto_user_presence(data.auto_user_presence);
-        ctap.suppress_attestation(data.suppress_attestation);
         ctap.set_pqc_policy(data.pqc_policy);
         ctap.set_keepalive_callback(set_waiting);
         Self { ctap }
@@ -100,8 +94,6 @@ pub fn run(config: RunnerConfig) -> io::Result<()> {
         state_dir,
         aaguid,
         identity,
-        auto_user_presence,
-        suppress_attestation,
         pqc_policy,
         backend,
     } = config;
@@ -115,12 +107,7 @@ pub fn run(config: RunnerConfig) -> io::Result<()> {
     })?;
     let store = persistent.store();
     let platform = Platform::new(store);
-    let data = AppData {
-        aaguid,
-        auto_user_presence,
-        suppress_attestation,
-        pqc_policy,
-    };
+    let data = AppData { aaguid, pqc_policy };
 
     match backend {
         Backend::Uhid => {
