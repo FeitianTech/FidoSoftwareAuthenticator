@@ -1,8 +1,13 @@
 use std::{
+    env,
     fs::{self, File, OpenOptions},
     io::{self, ErrorKind},
-    os::unix::{fs::symlink, fs::OpenOptionsExt, io::AsRawFd},
+    os::unix::{
+        fs::{symlink, OpenOptionsExt, PermissionsExt},
+        io::AsRawFd,
+    },
     path::{Path, PathBuf},
+    process::Command,
     thread,
     time::Duration,
 };
@@ -13,7 +18,7 @@ use nix::{
     fcntl::{fcntl, FcntlArg, OFlag},
     libc,
     poll::{poll, PollFd, PollFlags},
-    unistd::{read, write},
+    unistd::{chown, read, write, Gid, Uid},
 };
 
 use crate::uhid::{CtapHidFrame, CTAPHID_FRAME_LEN, CTAPHID_REPORT_DESCRIPTOR};
@@ -61,6 +66,89 @@ pub fn resolve_udc(preferred: Option<&str>) -> io::Result<String> {
             "no USB Device Controller (UDC) available under /sys/class/udc",
         ))
     }
+}
+
+pub fn ensure_dummy_hcd_loaded() -> io::Result<()> {
+    for module in ["libcomposite", "usb_f_hid", "dummy_hcd"] {
+        let status = Command::new("modprobe")
+            .arg(module)
+            .status()
+            .map_err(|err| {
+                io::Error::new(
+                    ErrorKind::Other,
+                    format!("failed to execute modprobe {module}: {err}"),
+                )
+            })?;
+
+        if !status.success() {
+            return Err(io::Error::new(
+                ErrorKind::Other,
+                format!("modprobe {module} exited with status {status}"),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn cleanup_stale_gadget(config: &GadgetConfig) -> io::Result<()> {
+    let root = config.root_path();
+    if !root.exists() {
+        return Ok(());
+    }
+
+    let udc_path = root.join("UDC");
+    if udc_path.exists() {
+        if let Err(err) = write_str(&udc_path, "") {
+            warn!(
+                "failed to unbind existing gadget {} from UDC: {err}",
+                root.display()
+            );
+        }
+    }
+
+    match fs::remove_dir_all(&root) {
+        Ok(()) => {
+            info!(
+                "removed leftover gadget configuration at {}",
+                root.display()
+            );
+            Ok(())
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err),
+    }
+}
+
+fn configure_device_node_permissions(path: &Path) -> io::Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+
+    let metadata = fs::metadata(path)?;
+    let mut permissions = metadata.permissions();
+    let desired_mode = 0o660;
+    if permissions.mode() & 0o777 != desired_mode {
+        permissions.set_mode(desired_mode);
+        fs::set_permissions(path, permissions)?;
+    }
+
+    let uid = env::var("SUDO_UID")
+        .or_else(|_| env::var("UID"))
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .map(Uid::from_raw);
+    let gid = env::var("SUDO_GID")
+        .or_else(|_| env::var("GID"))
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .map(Gid::from_raw);
+
+    if uid.is_some() || gid.is_some() {
+        chown(path, uid, gid).map_err(to_io_error)?;
+    }
+
+    Ok(())
 }
 
 fn write_str(path: &Path, value: &str) -> io::Result<()> {
@@ -162,6 +250,8 @@ impl UsbGadget {
             "USB HID gadget interface ready at {}",
             device_path.display()
         );
+
+        configure_device_node_permissions(&device_path)?;
 
         Ok(Self {
             root,

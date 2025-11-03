@@ -131,19 +131,13 @@ Omit `--foreground` to run the service as a background daemon. The CLI also expo
 The default backend provisions a configfs USB device that surfaces a real HID interface at `/dev/hidg0`. This requires the Linux USB gadget stack and an available USB Device Controller (UDC). On physical hardware, the UDC is provided by the SoC; on PCs or VMs you can load the `dummy_hcd` module to emulate one.
 
 ```bash
-sudo modprobe libcomposite usb_f_hid
-# For development on non-UDC hardware:
-sudo modprobe dummy_hcd
-
-# Inspect the available UDCs
-ls /sys/class/udc
-
-# Launch the authenticator bound to the selected UDC
-sudo env RUST_LOG=info \
-    cargo run -p pc-hid-runner -- \
-    start --gadget-udc dummy_udc.0 \
-    --foreground
+sudo RUST_LOG=info $(which cargo) run -p pc-hid-runner -- \
+    start --gadget-udc dummy_udc.0 --foreground
 ```
+
+The runner automatically loads the required gadget kernel modules (`libcomposite`, `usb_f_hid`, and `dummy_hcd`), cleans up any
+stale configfs gadget directory, and ensures `/dev/hidg0` is accessible to the invoking user before starting. When the process
+exits it tears the gadget down and releases the dummy UDC, so rerunning the command is enough to refresh the device.
 
 The gadget runner writes its configuration to `/sys/kernel/config/usb_gadget/<gadget-name>` (default `feitian-pqc-authenticator`) and cleans it up automatically when the process exits or you invoke `pc-hid-runner stop`. Customise the gadget parameters with:
 

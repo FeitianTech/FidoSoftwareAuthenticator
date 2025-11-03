@@ -128,6 +128,8 @@ pub fn run(config: RunnerConfig) -> io::Result<()> {
                     "gadget backend requested without gadget configuration",
                 )
             })?;
+            gadget::ensure_dummy_hcd_loaded()?;
+            gadget::cleanup_stale_gadget(&gadget_config)?;
             let udc = gadget::resolve_udc(gadget_config.udc.as_deref())?;
             let usb_options = options.clone();
             let device_class = usb_options.resolved_device_class(true, cfg!(feature = "ccid"));
