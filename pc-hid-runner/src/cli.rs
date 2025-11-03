@@ -19,7 +19,7 @@ use nix::{
 };
 use transport_core::state::default_state_dir;
 
-use crate::{permissions, service, HidDeviceDescriptor, Options};
+use crate::{gadget::GadgetConfig, permissions, service, HidDeviceDescriptor, Options};
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -98,11 +98,33 @@ pub struct DeviceArgs {
     /// Backend transport to use
     #[clap(long, value_enum, default_value_t = BackendArg::Uhid)]
     pub backend: BackendArg,
+    #[clap(flatten)]
+    pub gadget: GadgetArgs,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct GadgetArgs {
+    /// Path to the configfs USB gadget root
+    #[clap(long, default_value = "/sys/kernel/config/usb_gadget")]
+    pub gadget_root: PathBuf,
+    /// Name for the gadget created under configfs
+    #[clap(long, default_value = "feitian-pqc-authenticator")]
+    pub gadget_name: String,
+    /// USB device controller to bind (defaults to the first available)
+    #[clap(long)]
+    pub gadget_udc: Option<String>,
+    /// Max power in mA advertised by the configuration descriptor
+    #[clap(long, default_value_t = 100)]
+    pub gadget_max_power_ma: u16,
+    /// USB specification version (bcdUSB, hex)
+    #[clap(long, value_parser = maybe_hex::<u16>, default_value_t = 0x0200)]
+    pub gadget_usb_version: u16,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum, PartialEq, Eq)]
 pub enum BackendArg {
     Uhid,
+    Gadget,
     #[cfg(feature = "usbip-backend")]
     Usbip,
 }
@@ -128,6 +150,7 @@ impl BackendArg {
     fn into_backend(self) -> service::Backend {
         match self {
             BackendArg::Uhid => service::Backend::Uhid,
+            BackendArg::Gadget => service::Backend::Gadget,
             #[cfg(feature = "usbip-backend")]
             BackendArg::Usbip => service::Backend::Usbip,
         }
@@ -169,6 +192,17 @@ impl StartCommand {
             },
             pqc_policy: self.device.pqc_policy.into(),
             backend: self.device.backend.into_backend(),
+            gadget: if self.device.backend == BackendArg::Gadget {
+                Some(GadgetConfig {
+                    configfs_root: self.device.gadget.gadget_root.clone(),
+                    name: self.device.gadget.gadget_name.clone(),
+                    udc: self.device.gadget.gadget_udc.clone(),
+                    max_power_ma: self.device.gadget.gadget_max_power_ma,
+                    usb_version_bcd: self.device.gadget.gadget_usb_version,
+                })
+            } else {
+                None
+            },
         })
     }
 }

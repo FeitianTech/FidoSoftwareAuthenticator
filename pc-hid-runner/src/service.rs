@@ -15,11 +15,16 @@ use trussed::{
     types::{CoreContext, NoData},
 };
 
-use crate::{exec, HidDeviceDescriptor, CTAPHID_FRAME_LEN};
+use crate::{
+    exec, exec_gadget,
+    gadget::{self, GadgetConfig},
+    HidDeviceDescriptor, CTAPHID_FRAME_LEN,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Backend {
     Uhid,
+    Gadget,
     #[cfg(feature = "usbip-backend")]
     Usbip,
 }
@@ -39,6 +44,7 @@ pub struct RunnerConfig {
     pub identity: IdentityStrings,
     pub pqc_policy: PqcPolicy,
     pub backend: Backend,
+    pub gadget: Option<GadgetConfig>,
 }
 
 #[derive(Clone, Copy)]
@@ -96,6 +102,7 @@ pub fn run(config: RunnerConfig) -> io::Result<()> {
         identity,
         pqc_policy,
         backend,
+        gadget,
     } = config;
 
     let mut persistent = PersistentStore::new(&state_dir)?;
@@ -113,6 +120,35 @@ pub fn run(config: RunnerConfig) -> io::Result<()> {
         Backend::Uhid => {
             let runner = Builder::new(options).build::<Apps>();
             exec(runner, descriptor, platform, data)
+        }
+        Backend::Gadget => {
+            let gadget_config = gadget.ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "gadget backend requested without gadget configuration",
+                )
+            })?;
+            let udc = gadget::resolve_udc(gadget_config.udc.as_deref())?;
+            let usb_options = options.clone();
+            let device_class = usb_options.resolved_device_class(true, cfg!(feature = "ccid"));
+            let hid_version_bcd = (descriptor.version & 0xFFFF) as u16;
+            let gadget_device = gadget::UsbGadget::create(
+                &gadget_config,
+                &identity.manufacturer,
+                &identity.product,
+                &identity.serial,
+                usb_options.vid,
+                usb_options.pid,
+                (
+                    device_class.class,
+                    device_class.sub_class,
+                    device_class.protocol,
+                ),
+                hid_version_bcd,
+                &udc,
+            )?;
+            let runner = Builder::new(options).build::<Apps>();
+            exec_gadget(runner, gadget_device, platform, data)
         }
         #[cfg(feature = "usbip-backend")]
         Backend::Usbip => {

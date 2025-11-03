@@ -4,8 +4,8 @@ Software authenticator implementing post-quantum ML-DSA 44/65/87 with a Trussed-
 
 Highlights
 - Algorithms: ML-DSA 44/65/87, ES256.
-- Transports: USB HID (CTAPHID) presented through `/dev/uhid`. Optional CCID smartcard interface for smartcard-style applications.
-- Runner: Host UHID runner that creates a virtual hidraw node and bridges CTAPHID to Trussed. Optional USB/IP backend for legacy testing.
+- Transports: USB HID (CTAPHID) presented through `/dev/uhid` or a Linux USB gadget. Optional CCID smartcard interface for smartcard-style applications.
+- Runner: Host UHID runner that creates a virtual hidraw node and bridges CTAPHID to Trussed. A USB gadget backend exposes a real HID interface via configfs, and a legacy USB/IP backend remains for compatibility testing.
 
 ## Tech stack
 
@@ -52,6 +52,7 @@ System (Ubuntu/Debian)
 - Recommended for testing:
   - libfido2-tools (provides fido2-token)
 - usbip + vhci-hcd (only required for the legacy USB/IP runner)
+- Linux USB gadget stack (libcomposite, usb_f_hid, and a UDC such as dummy_hcd) when running the gadget backend
 
 Rust crates of note:
 - `nix` (with the `user` feature enabled for permission checks)
@@ -124,6 +125,36 @@ Useful flags:
 - `--pqc-policy <prefer|required|disabled>` — choose the PQC PIN/UV transport policy
 
 Omit `--foreground` to run the service as a background daemon. The CLI also exposes `status` and `stop` subcommands that inspect or terminate that daemonised instance.
+
+## Run the USB gadget runner
+
+The gadget backend provisions a configfs USB device that surfaces a real HID interface (`/dev/hidg*`). This requires the Linux USB gadget stack and an available USB Device Controller (UDC). On physical hardware, the UDC is provided by the SoC; on PCs or VMs you can load the `dummy_hcd` module to emulate one.
+
+```bash
+sudo modprobe libcomposite usb_f_hid
+# For development on non-UDC hardware:
+sudo modprobe dummy_hcd
+
+# Inspect the available UDCs
+ls /sys/class/udc
+
+# Launch the authenticator bound to the selected UDC
+sudo env RUST_LOG=info \
+    cargo run -p pc-hid-runner -- \
+    start --backend gadget \
+    --gadget-udc dummy_udc.0 \
+    --foreground
+```
+
+The gadget runner writes its configuration to `/sys/kernel/config/usb_gadget/<gadget-name>` (default `feitian-pqc-authenticator`) and cleans it up automatically when the process exits or you invoke `pc-hid-runner stop`. Customise the gadget parameters with:
+
+- `--gadget-root <path>` — alternate configfs mount point (defaults to `/sys/kernel/config/usb_gadget`).
+- `--gadget-name <name>` — override the gadget directory name.
+- `--gadget-udc <udc>` — explicitly choose the UDC instead of auto-detecting the first available entry in `/sys/class/udc`.
+- `--gadget-max-power-ma <mA>` — advertised configuration power draw (defaults to 100 mA).
+- `--gadget-usb-version <hex>` — USB specification version (bcdUSB) to advertise; defaults to `0x0200` (USB 2.0).
+
+Like the UHID runner, the gadget backend persists state in the configured `--state-dir` and shares all other command-line options (AAGUID, VID/PID, PQC policy, and identity strings).
 
 ## Validation
 
