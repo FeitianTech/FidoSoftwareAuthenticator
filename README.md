@@ -9,54 +9,72 @@ Highlights
 
 ## Tech stack
 
-- Languages: Rust (core, runner, USB/IP), C (ML-DSA implmenetation in liboqs)
-- Frameworks/Crates:
-  - Trussed (secure application framework)
-  - ctaphid-dispatch (CTAP2 frame dispatcher)
-  - nix (low-level syscalls and `/dev/uhid` access)
-  - libudev (hidraw enumeration)
-  - usbip-device (USB/IP device-side stack; patched locally, optional)
-- Tools:
-  - libfido2 (fido2-token) or python-fido2 (optional, for testing)
-  - USB/IP userspace (usbip) + kernel module (vhci-hcd) — only when exercising the legacy runner
+- Languages: Rust across all workspace crates; C for the liboqs ML-DSA/ML-KEM backends; a small amount of shell/systemd glue under `contrib/`.
+- Core crates: Trussed application framework, shared `transport-core` services, Rust wrappers `trussed-mldsa` and `trussed-mlkem`, CTAP/HID plumbing via `ctaphid-dispatch` + `usbd-ctaphid`, CCID support via `usbd-ccid`, CBOR tooling with `ciborium`, persistent storage via `littlefs2`, and zero-copy buffers using `heapless`/`heapless-bytes`.
+- Runner/runtime: `pc-hid-runner` (UHID daemon with Clap 4 CLI, `daemonize`, permission checks via `nix` + `libudev`), optional `pc-usbip-runner` backend built on `transport-core` and `usb-device`, plus plug-in support for USB/IP and CCID transports.
+- PQC + crypto: Prebuilt `liboqs` bundles surfaced through the `trussed-mldsa` and `trussed-mlkem` wrappers, classical ECC via `p256`, attestation scaffolding using `rcgen`, randomness sourced from `rand`/`rand_chacha`.
+- Tooling: Companion tooling includes `libfido2`, `python-fido2`, and USB/IP (`usbip`, `vhci-hcd`) for exercising the runners end-to-end.
 
 ## Patches and runner tools
 
-- Patched usbip-device (vendored under patches/usbip-device) to:
-  - Cap IN transfer sizes to host-requested length (buffer leftovers)
-  - Report device speed explicitly (Full-Speed vs High-Speed)
-  - Improve EP0 (control) handling by clearing stale IN data on new SETUP
-- PC USB/IP runner (pc-usbip-runner):
-  - Exposes the authenticator as a virtual USB device
-  - Can set the reported USB speed (FS/HS)
-  - Handles CTAPHID/CCID endpoints and event loop/keepalive
+- `pc-hid-runner/`: main host service; provides start/stop/status CLI, daemonizes with log output, verifies `/dev/uhid` permissions, toggles manual user presence, attestation suppression, PQC policy, and can swap to a USB/IP backend when built with the `usbip-backend` feature.
+- `pc-usbip-runner/`: legacy and testing runner backed by the `trussed-usbip` crate, instantiating CTAPHID and optional CCID endpoints over USB/IP while reusing `transport-core` state management.
+- `patches/usbip-device/`: vendored fork of the upstream crate wired in through `[patch.crates-io]`, retaining support for capped IN transfers, explicit speed reporting, and clean EP0 SETUP handling expected by the runners.
+- `patches/ssmarshal/`: local copy of `ssmarshal` that keeps the `no_std` serialization path Trussed relies on while avoiding upstream API drift.
+- `contrib/`: deployment assets including `systemd` service units and `udev` rules for hardened HID permissions.
 
 ## Project structure
 
-- pc-hid-runner/ — Host-side HID runner that bridges `/dev/uhid` to the authenticator stack
-- pc-usbip-runner/ — Legacy USB/IP runner that simulates a USB authenticator device
-- patches/usbip-device/ — Vendored/modified usbip-device crate used by the runner
-- docs/ — Documentation, notes, and troubleshooting (if present)
-- Other Rust/C crates — Core authenticator logic, CTAP2 handlers, and ML-DSA crypto
-  - Typical layout: Cargo workspaces for Rust crates, and a C library for ML-DSA
+```
+.
+├── authenticator/
+│   ├── Cargo.toml
+│   └── src/
+│       ├── ctap.rs
+│       └── ctap/
+│           └── tests.rs
+├── contrib/
+│   ├── systemd/
+│   └── udev/
+├── patches/
+│   ├── ssmarshal/
+│   └── usbip-device/
+├── pc-hid-runner/
+│   ├── Cargo.toml
+│   └── src/
+├── pc-usbip-runner/
+│   ├── Cargo.toml
+│   └── src/
+├── prebuilt_liboqs/
+│   ├── linux-aarch64/
+│   └── linux-x86_64/
+├── transport-core/
+│   ├── Cargo.toml
+│   └── src/
+├── trussed-mldsa/
+│   ├── Cargo.toml
+│   └── src/
+├── trussed-mlkem/
+│   ├── Cargo.toml
+│   └── src/
+├── Cargo.lock
+├── Cargo.toml
+└── README.md
+```
 
 ## Dependencies
 
 System (Ubuntu/Debian)
-- Required:
-  - Rust toolchain (rustup recommended): rustc, cargo
-  - C toolchain: build-essential (or clang)
-  - libclang-dev (for bindgen, if used)
-  - pkg-config
-  - libudev-dev
-- Recommended for testing:
-  - libfido2-tools (provides fido2-token)
-- usbip + vhci-hcd (only required for the legacy USB/IP runner)
+- Required: Rust toolchain (rustup recommended), C toolchain (`build-essential` or `clang`), `pkg-config`, `libudev-dev`, `libclang-dev`.
+- Optional/testing: `libfido2-tools`, `python3-pip` + `python-fido2`, `usbip` with the `vhci-hcd` kernel module, `systemd` if you plan to install the provided unit.
+- Kernel modules: `uhid` for the HID runner, `vhci-hcd` when exercising the USB/IP backend.
 
 Rust crates of note:
-- `nix` (with the `user` feature enabled for permission checks)
-- `libudev` (safe bindings to enumerate hidraw devices)
-- `ctaphid-dispatch` (frames CTAP messages for the host transport)
+- `transport-core` (shared CTAP/CCID state, storage, and attestation helpers).
+- `trussed-mldsa` / `trussed-mlkem` (liboqs-backed PQC bindings).
+- `littlefs2`, `littlefs2-core`, `interchange`, `heapless`, `heapless-bytes` (persistent storage and zero-copy data paths).
+- `rcgen`, `p256`, `rand`, `rand_chacha`, `ciborium` (cryptography, attestation, and CBOR support).
+- `clap`, `daemonize`, `nix`, `libudev`, `signal-hook` (runner CLI and host integration).
 
 Install (example on Ubuntu/Debian)
 ```bash
