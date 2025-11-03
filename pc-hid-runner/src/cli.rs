@@ -1,7 +1,7 @@
 use std::{
     fs::{self, OpenOptions},
     io,
-    os::unix::fs::OpenOptionsExt,
+    os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     process, thread,
     time::{Duration, Instant},
@@ -19,7 +19,10 @@ use nix::{
 };
 use transport_core::state::default_state_dir;
 
-use crate::{gadget::GadgetConfig, permissions, service, HidDeviceDescriptor, Options};
+use crate::{
+    gadget::{GadgetConfig, HID_DEVICE_NODE},
+    permissions, service, HidDeviceDescriptor, Options,
+};
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -96,7 +99,7 @@ pub struct DeviceArgs {
     #[clap(long, value_enum, default_value_t = PqcPolicyArg::Prefer)]
     pub pqc_policy: PqcPolicyArg,
     /// Backend transport to use
-    #[clap(long, value_enum, default_value_t = BackendArg::Uhid)]
+    #[clap(long, value_enum, default_value_t = BackendArg::Gadget)]
     pub backend: BackendArg,
     #[clap(flatten)]
     pub gadget: GadgetArgs,
@@ -241,7 +244,16 @@ fn run_service(config: service::RunnerConfig) -> io::Result<()> {
     service::run(config)
 }
 
-fn warn_device_permissions(descriptor: &HidDeviceDescriptor) {
+fn warn_backend_permissions(config: &service::RunnerConfig) {
+    match config.backend {
+        service::Backend::Uhid => warn_uhid_permissions(&config.descriptor),
+        service::Backend::Gadget => warn_gadget_permissions(config),
+        #[cfg(feature = "usbip-backend")]
+        service::Backend::Usbip => {}
+    }
+}
+
+fn warn_uhid_permissions(descriptor: &HidDeviceDescriptor) {
     let euid = unistd::geteuid();
     if euid.is_root() {
         return;
@@ -270,6 +282,40 @@ fn warn_device_permissions(descriptor: &HidDeviceDescriptor) {
                     mode
                 );
             }
+        }
+    }
+}
+
+fn warn_gadget_permissions(config: &service::RunnerConfig) {
+    if !unistd::geteuid().is_root() {
+        eprintln!(
+            "warning: configuring the USB gadget backend requires root access to configfs and {}.",
+            HID_DEVICE_NODE
+        );
+    }
+
+    if let Some(gadget) = &config.gadget {
+        let gadget_root = gadget.configfs_root.join(&gadget.name);
+        if gadget_root.exists() {
+            eprintln!(
+                "warning: gadget directory {} already exists and will be reused; ensure no other instance is running.",
+                gadget_root.display()
+            );
+        }
+    }
+
+    let device_path = Path::new(HID_DEVICE_NODE);
+    if device_path.exists() {
+        if let Ok(metadata) = device_path.metadata() {
+            let mode = metadata.permissions().mode() & 0o777;
+            if mode & 0o006 == 0 {
+                return;
+            }
+            eprintln!(
+                "warning: {} is currently world- or group-writable (mode {:o}); adjust permissions if this is unintended.",
+                device_path.display(),
+                mode
+            );
         }
     }
 }
@@ -322,7 +368,7 @@ fn start(cmd: StartCommand) -> io::Result<()> {
         .to_runner_config()
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
 
-    warn_device_permissions(&config.descriptor);
+    warn_backend_permissions(&config);
 
     if cmd.foreground {
         fs::write(&pid_path, format!("{}\n", process::id()))?;

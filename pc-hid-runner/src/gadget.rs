@@ -24,6 +24,8 @@ const STRINGS_LANG: &str = "0x409";
 const DEVICE_APPEARANCE_WAIT_LOOPS: usize = 100;
 const DEVICE_APPEARANCE_WAIT_DELAY: Duration = Duration::from_millis(50);
 
+pub const HID_DEVICE_NODE: &str = "/dev/hidg0";
+
 #[derive(Clone, Debug)]
 pub struct GadgetConfig {
     pub configfs_root: PathBuf,
@@ -156,6 +158,11 @@ impl UsbGadget {
         let device_path = hid_device_node(HID_FUNCTION);
         wait_for_device(&device_path)?;
 
+        info!(
+            "USB HID gadget interface ready at {}",
+            device_path.display()
+        );
+
         Ok(Self {
             root,
             udc_path,
@@ -185,10 +192,8 @@ impl Drop for UsbGadget {
     }
 }
 
-fn hid_device_node(function: &str) -> PathBuf {
-    let suffix = function.rsplit('.').next().unwrap_or("usb0");
-    let idx = suffix.trim_start_matches("usb");
-    PathBuf::from(format!("/dev/hidg{}", idx))
+fn hid_device_node(_function: &str) -> PathBuf {
+    PathBuf::from(HID_DEVICE_NODE)
 }
 
 fn wait_for_device(path: &Path) -> io::Result<()> {

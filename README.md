@@ -128,7 +128,7 @@ Omit `--foreground` to run the service as a background daemon. The CLI also expo
 
 ## Run the USB gadget runner
 
-The gadget backend provisions a configfs USB device that surfaces a real HID interface (`/dev/hidg*`). This requires the Linux USB gadget stack and an available USB Device Controller (UDC). On physical hardware, the UDC is provided by the SoC; on PCs or VMs you can load the `dummy_hcd` module to emulate one.
+The default backend provisions a configfs USB device that surfaces a real HID interface at `/dev/hidg0`. This requires the Linux USB gadget stack and an available USB Device Controller (UDC). On physical hardware, the UDC is provided by the SoC; on PCs or VMs you can load the `dummy_hcd` module to emulate one.
 
 ```bash
 sudo modprobe libcomposite usb_f_hid
@@ -141,8 +141,7 @@ ls /sys/class/udc
 # Launch the authenticator bound to the selected UDC
 sudo env RUST_LOG=info \
     cargo run -p pc-hid-runner -- \
-    start --backend gadget \
-    --gadget-udc dummy_udc.0 \
+    start --gadget-udc dummy_udc.0 \
     --foreground
 ```
 
@@ -154,7 +153,7 @@ The gadget runner writes its configuration to `/sys/kernel/config/usb_gadget/<ga
 - `--gadget-max-power-ma <mA>` — advertised configuration power draw (defaults to 100 mA).
 - `--gadget-usb-version <hex>` — USB specification version (bcdUSB) to advertise; defaults to `0x0200` (USB 2.0).
 
-Like the UHID runner, the gadget backend persists state in the configured `--state-dir` and shares all other command-line options (AAGUID, VID/PID, PQC policy, and identity strings).
+Like the UHID runner, the gadget backend persists state in the configured `--state-dir` and shares all other command-line options (AAGUID, VID/PID, PQC policy, and identity strings). To switch back to the legacy `/dev/uhid` transport, pass `--backend uhid` explicitly.
 
 ## Validation
 
